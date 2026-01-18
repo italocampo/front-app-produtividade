@@ -83,8 +83,8 @@ function App() {
       <header className="p-6 pt-10 bg-slate-800 rounded-b-3xl shadow-lg border-b border-slate-700">
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">Minha Rotina 🚀</h1>
-            <p className="text-slate-400 text-sm">Foco total, Italo!</p>
+            <h1 className="text-2xl font-bold text-white">Metas do dia 🚀</h1>
+            <p className="text-slate-400 text-sm">A persistência é o caminho do êxito.</p>
           </div>
           <button onClick={carregarMetas} className="p-2 bg-slate-700 rounded-full hover:bg-slate-600 transition">
             <RefreshCw size={18} className={loading ? "animate-spin text-green-400" : "text-white"} />
