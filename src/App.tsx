@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react';
 import { 
   Plus, Trash2, ArrowRight, Activity, Book, Briefcase, Heart, Zap, 
   CheckSquare, Square, LayoutDashboard, Smile, 
-  Brain, ChevronLeft, BarChart3, Settings, Droplets, Loader2 
+  Brain, ChevronLeft, BarChart3, Calendar, Droplets, Loader2 
 } from 'lucide-react';
 import type { HabitoBase, PlanoSemanal, DiaSemana } from './types';
 
 // --- CONFIGURAÇÃO DA API ---
-// O link que você me mandou (sem a barra no final para evitar duplicidade)
 const API_URL = 'https://backend-apis-api-app-produtividade.t8sftf.easypanel.host';
 
 // --- TIPOS INTERNOS ---
@@ -25,17 +24,16 @@ function App() {
   };
 
   // --- ESTADOS GLOBAIS ---
-  const [loading, setLoading] = useState(true); // Para mostrar carregando no inicio
+  const [loading, setLoading] = useState(true);
   const [tela, setTela] = useState<TelaAtual>('ROTINA');
   
-  // Agora os dados começam vazios, pois virão da API
   const [rotinaBase, setRotinaBase] = useState<HabitoBase[]>([]);
   const [planoSemanal, setPlanoSemanal] = useState<PlanoSemanal>({ 
     seg: [], ter: [], qua: [], qui: [], sex: [], sab: [], dom: [] 
   });
   const [concluidasHoje, setConcluidasHoje] = useState<string[]>([]);
 
-  // --- 1. CARREGAR DADOS AO INICIAR (GET /init) ---
+  // --- 1. CARREGAR DADOS AO INICIAR ---
   useEffect(() => {
     const dataHoje = getDataFormatada();
     
@@ -54,7 +52,7 @@ function App() {
       });
   }, []);
 
-  // --- LÓGICA DE ROTINA (POST & DELETE) ---
+  // --- LÓGICA DE ROTINA ---
   const [novoHabito, setNovoHabito] = useState('');
   const [categoria, setCategoria] = useState<HabitoBase['categoria']>('Saúde');
 
@@ -62,13 +60,11 @@ function App() {
     e.preventDefault();
     if (!novoHabito.trim()) return;
 
-    // Otimista: Atualiza a tela antes do servidor responder (mais rápido)
     const tempId = crypto.randomUUID();
     const novoLocal: HabitoBase = { id: tempId, nome: novoHabito, categoria };
     setRotinaBase([...rotinaBase, novoLocal]);
     setNovoHabito('');
 
-    // Chama a API
     try {
       const res = await fetch(`${API_URL}/habitos`, {
         method: 'POST',
@@ -77,7 +73,6 @@ function App() {
       });
       const habitoReal = await res.json();
       
-      // Atualiza com o ID real do banco de dados
       setRotinaBase(prev => prev.map(h => h.id === tempId ? habitoReal : h));
     } catch {
       alert("Erro ao salvar. Tente novamente.");
@@ -87,8 +82,8 @@ function App() {
   async function removerHabito(id: string) {
     if(!confirm('Excluir este hábito permanentemente?')) return;
 
-    setRotinaBase(rotinaBase.filter(h => h.id !== id)); // Remove da tela
-    await fetch(`${API_URL}/habitos/${id}`, { method: 'DELETE' }); // Remove do banco
+    setRotinaBase(rotinaBase.filter(h => h.id !== id));
+    await fetch(`${API_URL}/habitos/${id}`, { method: 'DELETE' });
   }
 
   // --- LÓGICA DE PLANEJAMENTO ---
@@ -100,14 +95,12 @@ function App() {
   };
 
   async function toggleHabitoNoDia(habitoId: string) {
-    // 1. Atualiza visualmente primeiro
     const habitosDoDia = planoSemanal[diaSelecionado];
     const jaTem = habitosDoDia.includes(habitoId);
     const novos = jaTem ? habitosDoDia.filter(id => id !== habitoId) : [...habitosDoDia, habitoId];
     
     setPlanoSemanal({ ...planoSemanal, [diaSelecionado]: novos });
 
-    // 2. Salva no servidor
     await fetch(`${API_URL}/plano/toggle`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -118,13 +111,11 @@ function App() {
   async function replicarParaSemana() {
     if (!confirm('Copiar a rotina de Segunda para toda a semana?')) return;
     
-    // Atualiza visualmente
     const modelo = planoSemanal['seg'];
     setPlanoSemanal({
       seg: modelo, ter: modelo, qua: modelo, qui: modelo, sex: modelo, sab: modelo, dom: modelo
     });
 
-    // Salva no servidor
     await fetch(`${API_URL}/plano/replicar`, { method: 'POST' });
   }
 
@@ -136,14 +127,12 @@ function App() {
   );
 
   async function toggleConclusaoHoje(id: string) {
-    // Atualiza tela
     if (concluidasHoje.includes(id)) {
       setConcluidasHoje(concluidasHoje.filter(c => c !== id));
     } else {
       setConcluidasHoje([...concluidasHoje, id]);
     }
 
-    // Salva no banco (Data de hoje)
     await fetch(`${API_URL}/execucao/toggle`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -155,7 +144,6 @@ function App() {
     ? Math.round((concluidasHoje.length / tarefasDeHoje.length) * 100) 
     : 0;
 
-  // Ícones
   const getIconeCategoria = (cat: string) => {
     switch(cat) {
       case 'Saúde': return <Heart size={16} className="text-red-400" />;
@@ -168,7 +156,6 @@ function App() {
     }
   };
 
-  // --- TELA DE CARREGAMENTO ---
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-4">
@@ -187,9 +174,9 @@ function App() {
           <header className="pt-8 flex justify-between items-start">
             <div>
               <h1 className="text-2xl font-bold text-white mb-1">Rotina Base 🏗️</h1>
-              <p className="text-slate-400 text-sm">Biblioteca de hábitos (Nuvem ☁️).</p>
+              <p className="text-slate-400 text-sm">Biblioteca de hábitos.</p>
             </div>
-            <button onClick={() => setTela('HOJE')} className="p-2 bg-slate-800 rounded-lg text-slate-400">
+            <button onClick={() => setTela('HOJE')} className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
                <ArrowRight />
             </button>
           </header>
@@ -211,7 +198,7 @@ function App() {
                 </button>
               ))}
             </div>
-            <button type="submit" className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2">
+            <button type="submit" className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition">
               <Plus size={20} /> Criar Novo
             </button>
           </form>
@@ -225,12 +212,12 @@ function App() {
                    <div className="p-2 bg-slate-800 rounded-lg">{getIconeCategoria(h.categoria)}</div>
                    <span className="font-medium text-slate-200">{h.nome}</span>
                 </div>
-                <button onClick={() => removerHabito(h.id)} className="text-slate-600 hover:text-red-400 p-2"><Trash2 size={18} /></button>
+                <button onClick={() => removerHabito(h.id)} className="text-slate-600 hover:text-red-400 p-2 transition"><Trash2 size={18} /></button>
               </div>
             ))}
           </div>
 
-          <button onClick={() => setTela('PLANEJAMENTO')} className="fixed bottom-6 right-6 left-6 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2">
+          <button onClick={() => setTela('PLANEJAMENTO')} className="fixed bottom-6 right-6 left-6 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 transition">
             Ir para Planejamento <ArrowRight size={20} />
           </button>
         </div>
@@ -241,14 +228,14 @@ function App() {
         <div className="max-w-md mx-auto space-y-6 animate-in slide-in-from-right">
           <header className="pt-4 flex justify-between items-center">
              <div><h1 className="text-xl font-bold text-white">Planejamento 📅</h1><p className="text-slate-400 text-xs">Monte sua semana.</p></div>
-             <button onClick={() => setTela('HOJE')} className="text-xs text-slate-500 underline">Voltar p/ Hoje</button>
+             <button onClick={() => setTela('HOJE')} className="text-xs text-slate-500 underline hover:text-slate-300 transition">Voltar p/ Hoje</button>
           </header>
 
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             {(Object.keys(diasDisplay) as DiaSemana[]).map(dia => (
               <button key={dia} onClick={() => setDiaSelecionado(dia)}
                 className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap transition-all ${
-                  diaSelecionado === dia ? 'bg-green-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 border border-slate-700'
+                  diaSelecionado === dia ? 'bg-green-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700'
                 }`}
               >
                 {diasDisplay[dia]}
@@ -259,7 +246,7 @@ function App() {
           <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-800 min-h-[400px]">
             <div className="flex justify-between items-center mb-4">
               <h2 className="font-bold text-slate-200">Para {diasDisplay[diaSelecionado]}:</h2>
-              {diaSelecionado === 'seg' && <button onClick={replicarParaSemana} className="text-xs text-blue-400 underline">Copiar Seg p/ todos</button>}
+              {diaSelecionado === 'seg' && <button onClick={replicarParaSemana} className="text-xs text-blue-400 underline hover:text-blue-300 transition">Copiar Seg p/ todos</button>}
             </div>
             
             <div className="space-y-2">
@@ -269,7 +256,7 @@ function App() {
                 return (
                   <div key={h.id} onClick={() => toggleHabitoNoDia(h.id)}
                     className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                      selecionado ? 'bg-green-900/20 border-green-800' : 'bg-slate-800 border-slate-700 opacity-60'
+                      selecionado ? 'bg-green-900/20 border-green-800' : 'bg-slate-800 border-slate-700 opacity-60 hover:opacity-100'
                     }`}
                   >
                     {selecionado ? <CheckSquare className="text-green-500" /> : <Square className="text-slate-500" />}
@@ -281,7 +268,7 @@ function App() {
             </div>
           </div>
 
-          <button onClick={() => setTela('HOJE')} className="fixed bottom-6 right-6 left-6 bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2">
+          <button onClick={() => setTela('HOJE')} className="fixed bottom-6 right-6 left-6 bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 transition">
             <LayoutDashboard size={20} /> Salvar e Ver Hoje
           </button>
         </div>
@@ -291,18 +278,21 @@ function App() {
       {tela === 'HOJE' && (
         <div className="max-w-md mx-auto space-y-6 animate-in zoom-in duration-300">
           
-          {/* Header do Dia */}
-          <header className="pt-6 flex justify-between items-start">
-            <div>
+          {/* Header do Dia (Atualizado!) */}
+          <header className="pt-6 flex justify-between items-center">
+            <button onClick={() => setTela('ROTINA')} className="p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition flex items-center justify-center mr-4">
+               <ChevronLeft size={24} />
+            </button>
+            <div className="flex-1">
               <p className="text-green-400 font-bold text-xs uppercase tracking-wider mb-1">Visão do Dia</p>
               <h1 className="text-3xl font-bold text-white capitalize">{diasDisplay[diaRealCodigo]}</h1>
             </div>
             <div className="flex gap-2">
-               <button onClick={() => setTela('ESTATISTICAS')} className="p-3 bg-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-700 transition">
+               <button onClick={() => setTela('ESTATISTICAS')} className="p-3 bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 rounded-xl transition flex items-center justify-center">
                 <BarChart3 size={20} />
               </button>
-              <button onClick={() => setTela('PLANEJAMENTO')} className="p-3 bg-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-700 transition">
-                <Settings size={20} />
+              <button onClick={() => setTela('PLANEJAMENTO')} className="p-3 bg-purple-600/20 text-purple-400 hover:bg-purple-600/40 rounded-xl transition flex items-center justify-center">
+                <Calendar size={20} />
               </button>
             </div>
           </header>
@@ -330,7 +320,7 @@ function App() {
               <div className="text-center py-10 opacity-50 border-2 border-dashed border-slate-800 rounded-2xl">
                 <Smile size={48} className="mx-auto mb-3 text-slate-600" />
                 <p>Dia livre!</p>
-                <button onClick={() => setTela('PLANEJAMENTO')} className="text-blue-400 text-sm mt-2 underline">Configurar Planejamento</button>
+                <button onClick={() => setTela('PLANEJAMENTO')} className="text-blue-400 text-sm mt-2 underline hover:text-blue-300 transition">Configurar Planejamento</button>
               </div>
             ) : (
               tarefasDeHoje.map(h => {
@@ -366,11 +356,11 @@ function App() {
         </div>
       )}
 
-      {/* --- TELA 4: ESTATÍSTICAS (NOVA!) --- */}
+      {/* --- TELA 4: ESTATÍSTICAS --- */}
       {tela === 'ESTATISTICAS' && (
         <div className="max-w-md mx-auto space-y-6 animate-in slide-in-from-right">
            <header className="pt-6 flex items-center gap-4">
-            <button onClick={() => setTela('HOJE')} className="p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700">
+            <button onClick={() => setTela('HOJE')} className="p-2 bg-slate-800 rounded-full text-white hover:bg-slate-700 transition">
                <ChevronLeft />
             </button>
             <h1 className="text-xl font-bold text-white">Estatísticas 📊</h1>
@@ -382,7 +372,7 @@ function App() {
              <div className="flex items-end justify-between h-40 gap-2">
                 {(Object.keys(diasDisplay) as DiaSemana[]).map(dia => {
                    const qtd = planoSemanal[dia].length;
-                   const altura = qtd > 0 ? (qtd / 10) * 100 : 5; // Altura relativa
+                   const altura = qtd > 0 ? (qtd / 10) * 100 : 5;
                    const isHoje = dia === diaRealCodigo;
                    
                    return (
@@ -415,12 +405,6 @@ function App() {
                 <p className="text-slate-500 text-xs font-bold uppercase">Concluídas</p>
                 <p className="text-3xl font-bold text-green-400 mt-1">{concluidasHoje.length}</p>
              </div>
-          </div>
-
-          <div className="p-4 bg-blue-900/20 border border-blue-900 rounded-xl text-center">
-             <p className="text-blue-300 text-sm">
-                Conectado ao Banco de Dados Postgres! 🚀
-             </p>
           </div>
         </div>
       )}
