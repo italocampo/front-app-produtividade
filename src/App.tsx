@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Plus, Trash2, Activity, Book, Briefcase, Heart, Zap, 
-  CheckSquare, Square,Smile, 
+  CheckSquare, Square, Smile, 
   Brain, ChevronLeft, BarChart3, Calendar, Droplets, Loader2, List
 } from 'lucide-react';
 import type { HabitoBase, PlanoSemanal, DiaSemana } from './types';
@@ -20,12 +20,22 @@ function App() {
   };
 
   const getDataFormatada = () => {
-    return new Date().toISOString().split('T')[0]; // Retorna YYYY-MM-DD
+    return new Date().toISOString().split('T')[0];
   };
 
   // --- ESTADOS GLOBAIS ---
   const [loading, setLoading] = useState(true);
-  const [tela, setTela] = useState<TelaAtual>('HOJE'); // Começa na tela principal (HOJE)
+  
+  // 1. CORREÇÃO AQUI: O estado agora lê da memória antes de iniciar
+  const [tela, setTela] = useState<TelaAtual>(() => {
+    const salvo = localStorage.getItem('app_tela_atual');
+    return (salvo as TelaAtual) || 'HOJE';
+  });
+
+  // 2. CORREÇÃO AQUI: Salva na memória toda vez que muda de tela
+  useEffect(() => {
+    localStorage.setItem('app_tela_atual', tela);
+  }, [tela]);
   
   const [rotinaBase, setRotinaBase] = useState<HabitoBase[]>([]);
   const [planoSemanal, setPlanoSemanal] = useState<PlanoSemanal>({ 
@@ -33,7 +43,7 @@ function App() {
   });
   const [concluidasHoje, setConcluidasHoje] = useState<string[]>([]);
 
-  // --- 1. CARREGAR DADOS AO INICIAR ---
+  // --- CARREGAR DADOS AO INICIAR ---
   useEffect(() => {
     const dataHoje = getDataFormatada();
     
@@ -44,12 +54,13 @@ function App() {
         setPlanoSemanal(data.planoSemanal);
         setConcluidasHoje(data.concluidasHoje);
         setLoading(false);
-        // Se não tiver nenhum hábito, joga pra tela de cadastro automaticamente
-        if (data.rotinaBase.length === 0) setTela('ROTINA');
+        
+        if (data.rotinaBase.length === 0) {
+           setTela('ROTINA');
+        }
       })
       .catch(erro => {
-        console.error("Erro ao conectar na API:", erro);
-        alert("Erro ao conectar no servidor. Verifique sua internet.");
+        console.error("Erro API:", erro);
         setLoading(false);
       });
   }, []);
@@ -74,16 +85,14 @@ function App() {
         body: JSON.stringify({ nome: novoHabito, categoria })
       });
       const habitoReal = await res.json();
-      
       setRotinaBase(prev => prev.map(h => h.id === tempId ? habitoReal : h));
     } catch{
-      alert("Erro ao salvar. Tente novamente.");
+      alert("Erro ao salvar.");
     }
   }
 
   async function removerHabito(id: string) {
     if(!confirm('Excluir este hábito permanentemente?')) return;
-
     setRotinaBase(rotinaBase.filter(h => h.id !== id));
     await fetch(`${API_URL}/habitos/${id}`, { method: 'DELETE' });
   }
@@ -98,8 +107,9 @@ function App() {
 
   async function toggleHabitoNoDia(habitoId: string) {
     const habitosDoDia = planoSemanal[diaSelecionado];
-    const jaTem = habitosDoDia.includes(habitoId);
-    const novos = jaTem ? habitosDoDia.filter(id => id !== habitoId) : [...habitosDoDia, habitoId];
+    const novos = habitosDoDia.includes(habitoId) 
+      ? habitosDoDia.filter(id => id !== habitoId) 
+      : [...habitosDoDia, habitoId];
     
     setPlanoSemanal({ ...planoSemanal, [diaSelecionado]: novos });
 
@@ -112,12 +122,10 @@ function App() {
 
   async function replicarParaSemana() {
     if (!confirm('Copiar a rotina de Segunda para toda a semana?')) return;
-    
     const modelo = planoSemanal['seg'];
     setPlanoSemanal({
       seg: modelo, ter: modelo, qua: modelo, qui: modelo, sex: modelo, sab: modelo, dom: modelo
     });
-
     await fetch(`${API_URL}/plano/replicar`, { method: 'POST' });
   }
 
@@ -174,13 +182,12 @@ function App() {
       {tela === 'ROTINA' && (
         <div className="max-w-md mx-auto space-y-6 animate-in fade-in">
           <header className="pt-6 flex justify-between items-center">
-            {/* BOTÃO VOLTAR (MUDADO) */}
             <button onClick={() => setTela('HOJE')} className="p-2 bg-slate-800 rounded-xl text-white hover:bg-slate-700 transition flex items-center gap-2 group">
                <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" /> 
                <span className="text-sm font-bold">Voltar</span>
             </button>
             <h1 className="text-xl font-bold text-white">Rotina Base 🏗️</h1>
-            <div className="w-16"></div> {/* Espaçador para centralizar */}
+            <div className="w-16"></div> 
           </header>
 
           <form onSubmit={adicionarHabito} className="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-3">
@@ -225,7 +232,6 @@ function App() {
       {tela === 'PLANEJAMENTO' && (
         <div className="max-w-md mx-auto space-y-6 animate-in slide-in-from-right">
           <header className="pt-6 flex justify-between items-center">
-             {/* BOTÃO VOLTAR CLARO */}
              <button onClick={() => setTela('HOJE')} className="p-2 bg-slate-800 rounded-xl text-white hover:bg-slate-700 transition flex items-center gap-2 group">
                <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" /> 
                <span className="text-sm font-bold">Voltar</span>
@@ -277,14 +283,9 @@ function App() {
       {tela === 'HOJE' && (
         <div className="max-w-md mx-auto space-y-6 animate-in zoom-in duration-300">
           
-          {/* Header do Dia (NAVBAR CORRIGIDA) */}
+          {/* Header do Dia */}
           <header className="pt-6 flex justify-between items-center">
-            {/* Botão NOVO para ir para Biblioteca/Rotina */}
-            <button 
-              onClick={() => setTela('ROTINA')} 
-              className="p-3 bg-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-700 transition border border-slate-700" 
-              title="Meus Hábitos"
-            >
+            <button onClick={() => setTela('ROTINA')} className="p-3 bg-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-700 transition border border-slate-700" title="Meus Hábitos">
                <List size={20} />
             </button>
 
@@ -294,11 +295,9 @@ function App() {
             </div>
 
             <div className="flex gap-2">
-               {/* Botão Estatísticas (Azul) */}
                <button onClick={() => setTela('ESTATISTICAS')} className="p-3 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 rounded-xl transition flex items-center justify-center border border-blue-900/30">
                 <BarChart3 size={20} />
               </button>
-              {/* Botão Planejamento (Roxo - CALENDÁRIO) */}
               <button onClick={() => setTela('PLANEJAMENTO')} className="p-3 bg-purple-600/10 text-purple-400 hover:bg-purple-600/20 rounded-xl transition flex items-center justify-center border border-purple-900/30">
                 <Calendar size={20} />
               </button>
