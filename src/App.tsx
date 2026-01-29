@@ -2,77 +2,93 @@ import { useState, useEffect } from 'react';
 import { 
   Plus, Trash2, ArrowRight, Activity, Book, Briefcase, Heart, Zap, 
   CheckSquare, Square, LayoutDashboard, Smile, 
-  Brain, ChevronLeft, BarChart3, Settings, Droplets 
+  Brain, ChevronLeft, BarChart3, Settings, Droplets, Loader2 
 } from 'lucide-react';
 import type { HabitoBase, PlanoSemanal, DiaSemana } from './types';
+
+// --- CONFIGURAÇÃO DA API ---
+// O link que você me mandou (sem a barra no final para evitar duplicidade)
+const API_URL = 'https://backend-apis-api-app-produtividade.t8sftf.easypanel.host';
 
 // --- TIPOS INTERNOS ---
 type TelaAtual = 'ROTINA' | 'PLANEJAMENTO' | 'HOJE' | 'ESTATISTICAS';
 
-// --- DADOS INICIAIS (Para não começar vazio) ---
-const HABITOS_INICIAIS: HabitoBase[] = [
-  { id: '1', nome: 'Treino / Academia', categoria: 'Saúde' },
-  { id: '2', nome: 'Beber 3L de Água', categoria: 'Saúde' },
-  { id: '3', nome: 'Leitura (30min)', categoria: 'Estudo' },
-  { id: '4', nome: 'Trabalho Focado', categoria: 'Trabalho' },
-  { id: '5', nome: 'Meditação / Oração', categoria: 'Espírito' },
-];
-
 function App() {
-  // --- FUNÇÕES AUXILIARES DE DATA ---
+  // --- FUNÇÕES AUXILIARES ---
   const getDiaReal = (): DiaSemana => {
     const map: DiaSemana[] = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
     return map[new Date().getDay()];
   };
 
-  // --- ESTADOS COM PERSISTÊNCIA (LocalStorage) ---
+  const getDataFormatada = () => {
+    return new Date().toISOString().split('T')[0]; // Retorna YYYY-MM-DD
+  };
+
+  // --- ESTADOS GLOBAIS ---
+  const [loading, setLoading] = useState(true); // Para mostrar carregando no inicio
+  const [tela, setTela] = useState<TelaAtual>('ROTINA');
   
-  // 1. Tela Atual
-  const [tela, setTela] = useState<TelaAtual>(() => {
-    const salvo = localStorage.getItem('app_tela');
-    return (salvo as TelaAtual) || 'ROTINA';
+  // Agora os dados começam vazios, pois virão da API
+  const [rotinaBase, setRotinaBase] = useState<HabitoBase[]>([]);
+  const [planoSemanal, setPlanoSemanal] = useState<PlanoSemanal>({ 
+    seg: [], ter: [], qua: [], qui: [], sex: [], sab: [], dom: [] 
   });
+  const [concluidasHoje, setConcluidasHoje] = useState<string[]>([]);
 
-  // 2. Rotina Base
-  const [rotinaBase, setRotinaBase] = useState<HabitoBase[]>(() => {
-    const salvo = localStorage.getItem('app_rotina');
-    return salvo ? JSON.parse(salvo) : HABITOS_INICIAIS;
-  });
-  
-  // 3. Planejamento Semanal
-  const [planoSemanal, setPlanoSemanal] = useState<PlanoSemanal>(() => {
-    const salvo = localStorage.getItem('app_plano');
-    return salvo ? JSON.parse(salvo) : { seg: [], ter: [], qua: [], qui: [], sex: [], sab: [], dom: [] };
-  });
+  // --- 1. CARREGAR DADOS AO INICIAR (GET /init) ---
+  useEffect(() => {
+    const dataHoje = getDataFormatada();
+    
+    fetch(`${API_URL}/init?data=${dataHoje}`)
+      .then(res => res.json())
+      .then(data => {
+        setRotinaBase(data.rotinaBase);
+        setPlanoSemanal(data.planoSemanal);
+        setConcluidasHoje(data.concluidasHoje);
+        setLoading(false);
+      })
+      .catch(erro => {
+        console.error("Erro ao conectar na API:", erro);
+        alert("Erro ao conectar no servidor. Verifique sua internet.");
+        setLoading(false);
+      });
+  }, []);
 
-  // 4. Concluídas Hoje
-  const [concluidasHoje, setConcluidasHoje] = useState<string[]>(() => {
-    const salvo = localStorage.getItem('app_concluidas');
-    return salvo ? JSON.parse(salvo) : [];
-  });
-
-  // --- EFEITOS (Salvar automaticamente) ---
-  useEffect(() => localStorage.setItem('app_tela', tela), [tela]);
-  useEffect(() => localStorage.setItem('app_rotina', JSON.stringify(rotinaBase)), [rotinaBase]);
-  useEffect(() => localStorage.setItem('app_plano', JSON.stringify(planoSemanal)), [planoSemanal]);
-  useEffect(() => localStorage.setItem('app_concluidas', JSON.stringify(concluidasHoje)), [concluidasHoje]);
-
-  // --- LÓGICA DE ROTINA ---
+  // --- LÓGICA DE ROTINA (POST & DELETE) ---
   const [novoHabito, setNovoHabito] = useState('');
   const [categoria, setCategoria] = useState<HabitoBase['categoria']>('Saúde');
 
-  function adicionarHabito(e: React.FormEvent) {
+  async function adicionarHabito(e: React.FormEvent) {
     e.preventDefault();
     if (!novoHabito.trim()) return;
-    const novo: HabitoBase = { id: crypto.randomUUID(), nome: novoHabito, categoria };
-    setRotinaBase([...rotinaBase, novo]);
+
+    // Otimista: Atualiza a tela antes do servidor responder (mais rápido)
+    const tempId = crypto.randomUUID();
+    const novoLocal: HabitoBase = { id: tempId, nome: novoHabito, categoria };
+    setRotinaBase([...rotinaBase, novoLocal]);
     setNovoHabito('');
+
+    // Chama a API
+    try {
+      const res = await fetch(`${API_URL}/habitos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome: novoHabito, categoria })
+      });
+      const habitoReal = await res.json();
+      
+      // Atualiza com o ID real do banco de dados
+      setRotinaBase(prev => prev.map(h => h.id === tempId ? habitoReal : h));
+    } catch (error) {
+      alert("Erro ao salvar. Tente novamente.");
+    }
   }
 
-  function removerHabito(id: string) {
-    if(confirm('Tem certeza que deseja excluir este hábito permanentemente?')) {
-      setRotinaBase(rotinaBase.filter(h => h.id !== id));
-    }
+  async function removerHabito(id: string) {
+    if(!confirm('Excluir este hábito permanentemente?')) return;
+
+    setRotinaBase(rotinaBase.filter(h => h.id !== id)); // Remove da tela
+    await fetch(`${API_URL}/habitos/${id}`, { method: 'DELETE' }); // Remove do banco
   }
 
   // --- LÓGICA DE PLANEJAMENTO ---
@@ -83,19 +99,33 @@ function App() {
     sex: 'Sexta', sab: 'Sábado', dom: 'Domingo'
   };
 
-  function toggleHabitoNoDia(habitoId: string) {
+  async function toggleHabitoNoDia(habitoId: string) {
+    // 1. Atualiza visualmente primeiro
     const habitosDoDia = planoSemanal[diaSelecionado];
     const jaTem = habitosDoDia.includes(habitoId);
     const novos = jaTem ? habitosDoDia.filter(id => id !== habitoId) : [...habitosDoDia, habitoId];
+    
     setPlanoSemanal({ ...planoSemanal, [diaSelecionado]: novos });
+
+    // 2. Salva no servidor
+    await fetch(`${API_URL}/plano/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ habitoId, diaSemana: diaSelecionado })
+    });
   }
 
-  function replicarParaSemana() {
+  async function replicarParaSemana() {
     if (!confirm('Copiar a rotina de Segunda para toda a semana?')) return;
+    
+    // Atualiza visualmente
     const modelo = planoSemanal['seg'];
     setPlanoSemanal({
       seg: modelo, ter: modelo, qua: modelo, qui: modelo, sex: modelo, sab: modelo, dom: modelo
     });
+
+    // Salva no servidor
+    await fetch(`${API_URL}/plano/replicar`, { method: 'POST' });
   }
 
   // --- LÓGICA DO DASHBOARD (HOJE) ---
@@ -105,12 +135,20 @@ function App() {
     planoSemanal[diaRealCodigo]?.includes(habito.id)
   );
 
-  function toggleConclusaoHoje(id: string) {
+  async function toggleConclusaoHoje(id: string) {
+    // Atualiza tela
     if (concluidasHoje.includes(id)) {
       setConcluidasHoje(concluidasHoje.filter(c => c !== id));
     } else {
       setConcluidasHoje([...concluidasHoje, id]);
     }
+
+    // Salva no banco (Data de hoje)
+    await fetch(`${API_URL}/execucao/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ habitoId: id, data: getDataFormatada() })
+    });
   }
 
   const progresso = tarefasDeHoje.length > 0 
@@ -130,6 +168,16 @@ function App() {
     }
   };
 
+  // --- TELA DE CARREGAMENTO ---
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-4">
+        <Loader2 className="animate-spin text-blue-500" size={48} />
+        <p>Conectando ao servidor...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 pb-24">
       
@@ -139,7 +187,7 @@ function App() {
           <header className="pt-8 flex justify-between items-start">
             <div>
               <h1 className="text-2xl font-bold text-white mb-1">Rotina Base 🏗️</h1>
-              <p className="text-slate-400 text-sm">Biblioteca de hábitos.</p>
+              <p className="text-slate-400 text-sm">Biblioteca de hábitos (Nuvem ☁️).</p>
             </div>
             <button onClick={() => setTela('HOJE')} className="p-2 bg-slate-800 rounded-lg text-slate-400">
                <ArrowRight />
@@ -170,6 +218,7 @@ function App() {
 
           <div className="space-y-2">
             <h3 className="text-xs font-bold text-slate-500 uppercase ml-1">Meus Hábitos Salvos</h3>
+            {rotinaBase.length === 0 && <p className="text-slate-600 text-sm text-center py-4">Nenhum hábito cadastrado ainda.</p>}
             {rotinaBase.map(h => (
               <div key={h.id} className="flex justify-between items-center bg-slate-900 p-3 rounded-xl border border-slate-800">
                 <div className="flex items-center gap-3">
@@ -333,7 +382,7 @@ function App() {
              <div className="flex items-end justify-between h-40 gap-2">
                 {(Object.keys(diasDisplay) as DiaSemana[]).map(dia => {
                    const qtd = planoSemanal[dia].length;
-                   const altura = qtd > 0 ? (qtd / 10) * 100 : 5; // Altura relativa (max 10 tarefas)
+                   const altura = qtd > 0 ? (qtd / 10) * 100 : 5; // Altura relativa
                    const isHoje = dia === diaRealCodigo;
                    
                    return (
@@ -343,7 +392,6 @@ function App() {
                               className={`w-full rounded-t-lg transition-all ${isHoje ? 'bg-green-500' : 'bg-slate-700'}`} 
                               style={{ height: `${Math.min(altura * 1.5, 100)}px` }}
                            ></div>
-                           {/* Tooltip com número */}
                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-bold text-white opacity-0 group-hover:opacity-100 transition">
                               {qtd}
                            </div>
@@ -371,7 +419,7 @@ function App() {
 
           <div className="p-4 bg-blue-900/20 border border-blue-900 rounded-xl text-center">
              <p className="text-blue-300 text-sm">
-                Em breve: Histórico completo de conclusões conectado ao Banco de Dados! 🚀
+                Conectado ao Banco de Dados Postgres! 🚀
              </p>
           </div>
         </div>
