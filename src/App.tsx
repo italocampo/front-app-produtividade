@@ -3,7 +3,7 @@ import {
   Plus, Trash2, Activity, Book, Briefcase, Heart, Zap, 
   CheckCircle2, Circle, Smile, Trophy,
   Brain, BarChart3, Calendar, Droplets, Loader2, 
-  LayoutDashboard, ListChecks
+  LayoutDashboard, ListChecks, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import type { HabitoBase, PlanoSemanal, DiaSemana } from './types';
 
@@ -17,7 +17,6 @@ type TelaAtual = 'HOJE' | 'ROTINA' | 'PLANEJAMENTO' | 'ESTATISTICAS';
 interface NavBtnProps {
   active: boolean;
   onClick: () => void;
-  // React.ElementType permite passar o componente do ícone como prop
   icon: React.ElementType; 
   label: string;
 }
@@ -41,7 +40,7 @@ const NavBtn = ({ active, onClick, icon: Icon, label }: NavBtnProps) => (
 
 const BottomNav = ({ tela, setTela }: BottomNavProps) => (
   <div className="fixed bottom-0 left-0 w-full bg-[#0f172a]/90 backdrop-blur-lg border-t border-white/5 pb-safe pt-2 px-6 flex justify-between items-center z-50">
-    <NavBtn active={tela === 'HOJE'} onClick={() => setTela('HOJE')} icon={LayoutDashboard} label="Hoje" />
+    <NavBtn active={tela === 'HOJE'} onClick={() => setTela('HOJE')} icon={LayoutDashboard} label="Diário" />
     <NavBtn active={tela === 'ROTINA'} onClick={() => setTela('ROTINA')} icon={ListChecks} label="Hábitos" />
     <NavBtn active={tela === 'PLANEJAMENTO'} onClick={() => setTela('PLANEJAMENTO')} icon={Calendar} label="Planejar" />
     <NavBtn active={tela === 'ESTATISTICAS'} onClick={() => setTela('ESTATISTICAS')} icon={BarChart3} label="Dados" />
@@ -49,36 +48,79 @@ const BottomNav = ({ tela, setTela }: BottomNavProps) => (
 );
 
 function App() {
-  // --- HELPERS ---
-  const getDiaReal = (): DiaSemana => {
-    const map: DiaSemana[] = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
-    return map[new Date().getDay()];
+  // --- HELPERS DE DATA (CORRIGIDOS PARA FUSO HORÁRIO LOCAL) ---
+  
+  // Retorna 'YYYY-MM-DD' baseado no horário LOCAL do usuário, não UTC
+  const formatarDataLocal = (date: Date) => {
+    const offset = date.getTimezoneOffset();
+    const dataLocal = new Date(date.getTime() - (offset * 60 * 1000));
+    return dataLocal.toISOString().split('T')[0];
   };
 
-  const getDataFormatada = () => new Date().toISOString().split('T')[0];
+  const getDiaSemanaDeData = (date: Date): DiaSemana => {
+    const map: DiaSemana[] = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+    return map[date.getDay()];
+  };
 
-  // --- ESTADOS ---
+  // --- ESTADOS GLOBAIS ---
   const [loading, setLoading] = useState(true);
   const [tela, setTela] = useState<TelaAtual>(() => (localStorage.getItem('app_tela_atual') as TelaAtual) || 'HOJE');
+  
+  // ESTADO NOVO: DATA SELECIONADA (Começa com Hoje)
+  const [dataVisualizacao, setDataVisualizacao] = useState(new Date());
 
   useEffect(() => { localStorage.setItem('app_tela_atual', tela); }, [tela]);
   
   const [rotinaBase, setRotinaBase] = useState<HabitoBase[]>([]);
   const [planoSemanal, setPlanoSemanal] = useState<PlanoSemanal>({ seg: [], ter: [], qua: [], qui: [], sex: [], sab: [], dom: [] });
-  const [concluidasHoje, setConcluidasHoje] = useState<string[]>([]);
+  const [concluidasNaData, setConcluidasNaData] = useState<string[]>([]);
 
-  // --- API LOAD ---
+  // --- NAVEGAÇÃO DE DATAS ---
+  const mudarDia = (dias: number) => {
+    const novaData = new Date(dataVisualizacao);
+    novaData.setDate(novaData.getDate() + dias);
+    setDataVisualizacao(novaData);
+    setLoading(true); // Mostra loading rápido ao trocar de dia
+  };
+
+  const irParaHoje = () => {
+    setDataVisualizacao(new Date());
+    setLoading(true);
+  };
+
+  // Label amigável (Ontem, Hoje, Amanhã)
+  const getLabelData = () => {
+    const hoje = new Date();
+    const dataAtual = dataVisualizacao;
+    
+    // Zera as horas para comparar apenas dia/mês/ano
+    const d1 = new Date(hoje.setHours(0,0,0,0));
+    const d2 = new Date(new Date(dataAtual).setHours(0,0,0,0));
+
+    const diffTime = d2.getTime() - d1.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+
+    if (diffDays === 0) return 'Hoje';
+    if (diffDays === -1) return 'Ontem';
+    if (diffDays === 1) return 'Amanhã';
+    
+    return dataAtual.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  };
+
+  // --- API LOAD (Recarrega sempre que a dataVisualizacao mudar) ---
   useEffect(() => {
-    fetch(`${API_URL}/init?data=${getDataFormatada()}`)
+    const dataString = formatarDataLocal(dataVisualizacao);
+    
+    fetch(`${API_URL}/init?data=${dataString}`)
       .then(res => res.json())
       .then(data => {
         setRotinaBase(data.rotinaBase);
         setPlanoSemanal(data.planoSemanal);
-        setConcluidasHoje(data.concluidasHoje);
+        setConcluidasNaData(data.concluidasHoje); // A API chama de 'concluidasHoje', mas agora é da data específica
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [dataVisualizacao]); // <--- O segredo: executa quando a data muda
 
   // --- ACTIONS ---
   const [novoHabito, setNovoHabito] = useState('');
@@ -91,16 +133,18 @@ function App() {
     setRotinaBase([...rotinaBase, { id: tempId, nome: novoHabito, categoria }]);
     setNovoHabito('');
     try {
-      const res = await fetch(`${API_URL}/habitos`, {
+      await fetch(`${API_URL}/habitos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nome: novoHabito, categoria })
       });
-      const real = await res.json();
-      setRotinaBase(prev => prev.map(h => h.id === tempId ? real : h));
+      // Recarrega para garantir ID correto
+      const dataString = formatarDataLocal(dataVisualizacao);
+      const res = await fetch(`${API_URL}/init?data=${dataString}`);
+      const data = await res.json();
+      setRotinaBase(data.rotinaBase);
     } catch (error) {
-      // CORREÇÃO DO ERRO NO-EMPTY: Adicionado console.error
-      console.error("Erro silencioso ao adicionar:", error);
+      console.error(error);
     }
   }
 
@@ -111,7 +155,7 @@ function App() {
   }
 
   // Planejamento
-  const [diaSelecionado, setDiaSelecionado] = useState<DiaSemana>(getDiaReal());
+  const [diaSelecionado, setDiaSelecionado] = useState<DiaSemana>(getDiaSemanaDeData(new Date()));
   const diasDisplay: Record<DiaSemana, string> = { seg: 'Segunda', ter: 'Terça', qua: 'Quarta', qui: 'Quinta', sex: 'Sexta', sab: 'Sábado', dom: 'Domingo' };
 
   async function toggleHabitoNoDia(habitoId: string) {
@@ -137,34 +181,37 @@ function App() {
   }
 
   // Dashboard & Toggle
-  const diaRealCodigo = getDiaReal();
-  const tarefasDeHoje = rotinaBase.filter(h => planoSemanal[diaRealCodigo]?.includes(h.id));
-  const concluidasValidas = concluidasHoje.filter(id => tarefasDeHoje.some(t => t.id === id));
+  const diaDaSemanaAtual = getDiaSemanaDeData(dataVisualizacao);
+  const tarefasDoDia = rotinaBase.filter(h => planoSemanal[diaDaSemanaAtual]?.includes(h.id));
+  
+  // Filtra apenas o que é válido para a data visualizada
+  const concluidasValidas = concluidasNaData.filter(id => tarefasDoDia.some(t => t.id === id));
 
-  async function toggleConclusaoHoje(id: string) {
-    const isDone = concluidasHoje.includes(id);
-    const newList = isDone ? concluidasHoje.filter(c => c !== id) : [...concluidasHoje, id];
+  async function toggleConclusao(id: string) {
+    const isDone = concluidasNaData.includes(id);
+    const newList = isDone ? concluidasNaData.filter(c => c !== id) : [...concluidasNaData, id];
     
-    setConcluidasHoje(newList);
+    setConcluidasNaData(newList);
+    
+    // Salva na data que está sendo visualizada!
     await fetch(`${API_URL}/execucao/toggle`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ habitoId: id, data: getDataFormatada() })
+      body: JSON.stringify({ habitoId: id, data: formatarDataLocal(dataVisualizacao) })
     });
   }
 
-  const progresso = tarefasDeHoje.length > 0 
-    ? Math.round((concluidasValidas.length / tarefasDeHoje.length) * 100) 
+  const progresso = tarefasDoDia.length > 0 
+    ? Math.round((concluidasValidas.length / tarefasDoDia.length) * 100) 
     : 0;
 
-  const statsPorCategoria = tarefasDeHoje.reduce((acc, t) => {
+  const statsPorCategoria = tarefasDoDia.reduce((acc, t) => {
     if (!acc[t.categoria]) acc[t.categoria] = { total: 0, done: 0 };
     acc[t.categoria].total++;
     if (concluidasValidas.includes(t.id)) acc[t.categoria].done++;
     return acc;
   }, {} as Record<string, { total: number, done: number }>);
 
-  // --- UI COMPONENTS ---
   const getIconeCategoria = (cat: string) => {
     switch(cat) {
       case 'Saúde': return <Heart size={18} className="text-rose-400" />;
@@ -177,88 +224,109 @@ function App() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#0b1121]"><Loader2 className="animate-spin text-indigo-500" size={40}/></div>;
-
   return (
     <div className="text-slate-100 font-sans antialiased selection:bg-indigo-500/30">
       <main className="p-5 pb-32 max-w-md mx-auto min-h-screen flex flex-col">
 
         {/* --- TELA: HOJE (DASHBOARD) --- */}
         {tela === 'HOJE' && (
-          <div className="animate-in fade-in zoom-in duration-500 space-y-8">
-            <header className="pt-8 flex justify-between items-end">
-              <div>
-                <p className="text-indigo-400 font-bold text-xs uppercase tracking-widest mb-1 opacity-90">Visão do Dia</p>
-                <h1 className="text-4xl font-extrabold text-white capitalize tracking-tight">{diasDisplay[diaRealCodigo]}</h1>
-              </div>
-              <div className="text-right">
-                <span className="text-3xl font-bold text-white">{concluidasValidas.length}</span>
-                <span className="text-slate-500 text-sm font-medium">/{tarefasDeHoje.length}</span>
+          <div className="animate-in fade-in zoom-in duration-500 space-y-6">
+            
+            {/* NOVO HEADER COM NAVEGAÇÃO DE DATAS */}
+            <header className="pt-8 flex flex-col gap-4">
+              <div className="flex justify-between items-center">
+                <button onClick={() => mudarDia(-1)} className="p-2 bg-slate-800/50 rounded-full hover:bg-slate-700 transition">
+                  <ChevronLeft size={20} />
+                </button>
+                
+                <div className="flex flex-col items-center cursor-pointer" onClick={irParaHoje}>
+                  <p className="text-indigo-400 font-bold text-xs uppercase tracking-widest mb-1 opacity-90">
+                    {diasDisplay[diaDaSemanaAtual]}
+                  </p>
+                  <h1 className="text-2xl font-extrabold text-white capitalize tracking-tight flex items-center gap-2">
+                    {getLabelData()} 
+                    {getLabelData() !== 'Hoje' && <span className="text-[10px] bg-slate-700 px-2 py-0.5 rounded-full text-slate-300">Voltar</span>}
+                  </h1>
+                </div>
+
+                <button onClick={() => mudarDia(1)} className="p-2 bg-slate-800/50 rounded-full hover:bg-slate-700 transition">
+                  <ChevronRight size={20} />
+                </button>
               </div>
             </header>
 
-            <div className="glass p-6 rounded-3xl relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-10 transition-opacity duration-700">
-                <Trophy size={140} />
-              </div>
-              <div className="relative z-10">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-slate-300 font-medium flex items-center gap-2"><Activity size={16} className="text-indigo-400"/> Produtividade</span>
-                  <span className="text-white font-bold text-xl">{progresso}%</span>
-                </div>
-                <div className="h-3 bg-slate-950/50 rounded-full overflow-hidden border border-white/5">
-                  <div 
-                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(99,102,241,0.5)]"
-                    style={{ width: `${progresso}%` }}
-                  />
-                </div>
-                {progresso === 100 && tarefasDeHoje.length > 0 && (
-                  <p className="text-center text-xs font-bold text-emerald-400 mt-4 animate-pulse uppercase tracking-widest">
-                    ✨ Meta Diária Batida! ✨
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h2 className="text-slate-500 text-xs font-bold uppercase tracking-wider pl-1">Sua Lista</h2>
-              
-              {tarefasDeHoje.length === 0 ? (
-                <div className="text-center py-16 opacity-60 border border-dashed border-slate-800 rounded-3xl bg-slate-900/20">
-                  <Smile size={48} className="mx-auto mb-4 text-slate-600" />
-                  <p className="text-slate-300 font-medium">Dia livre!</p>
-                  <button onClick={() => setTela('PLANEJAMENTO')} className="text-indigo-400 text-sm font-bold mt-2 hover:underline">
-                    Adicionar tarefas
-                  </button>
-                </div>
-              ) : (
-                tarefasDeHoje.map(h => {
-                  const feita = concluidasValidas.includes(h.id);
-                  return (
-                    <div key={h.id} onClick={() => toggleConclusaoHoje(h.id)}
-                      className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-300 border ${
-                        feita 
-                          ? 'bg-slate-900/30 border-transparent opacity-50' 
-                          : 'glass-active border-indigo-500/20 hover:border-indigo-500/50'
-                      }`}
-                    >
-                      <div className={`transition-all duration-300 ${feita ? 'text-emerald-500 scale-110' : 'text-slate-600'}`}>
-                        {feita ? <CheckCircle2 size={26} className="fill-current" /> : <Circle size={26} />}
-                      </div>
-                      <div className="flex-1">
-                        <p className={`font-semibold text-lg transition-all ${feita ? 'line-through text-slate-500' : 'text-white'}`}>
-                          {h.nome}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          {getIconeCategoria(h.categoria)}
-                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">{h.categoria}</span>
-                        </div>
-                      </div>
+            {/* Loading Rápido */}
+            {loading ? (
+              <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-indigo-500"/></div>
+            ) : (
+              <>
+                {/* Main Card Progress */}
+                <div className="glass p-6 rounded-3xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-10 transition-opacity duration-700">
+                    <Trophy size={140} />
+                  </div>
+                  <div className="relative z-10">
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-slate-300 font-medium flex items-center gap-2">
+                        <Activity size={16} className="text-indigo-400"/> Desempenho
+                      </span>
+                      <span className="text-white font-bold text-xl">{progresso}%</span>
                     </div>
-                  );
-                })
-              )}
-            </div>
+                    <div className="h-3 bg-slate-950/50 rounded-full overflow-hidden border border-white/5">
+                      <div 
+                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(99,102,241,0.5)]"
+                        style={{ width: `${progresso}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lista */}
+                <div className="space-y-3">
+                  <h2 className="text-slate-500 text-xs font-bold uppercase tracking-wider pl-1">
+                    Lista de {getLabelData()}
+                  </h2>
+                  
+                  {tarefasDoDia.length === 0 ? (
+                    <div className="text-center py-12 opacity-60 border border-dashed border-slate-800 rounded-3xl bg-slate-900/20">
+                      <Smile size={48} className="mx-auto mb-4 text-slate-600" />
+                      <p className="text-slate-300 font-medium">Nada agendado.</p>
+                      {getLabelData() === 'Hoje' && (
+                        <button onClick={() => setTela('PLANEJAMENTO')} className="text-indigo-400 text-sm font-bold mt-2 hover:underline">
+                          Planejar agora
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    tarefasDoDia.map(h => {
+                      const feita = concluidasValidas.includes(h.id);
+                      return (
+                        <div key={h.id} onClick={() => toggleConclusao(h.id)}
+                          className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-300 border ${
+                            feita 
+                              ? 'bg-slate-900/30 border-transparent opacity-50' 
+                              : 'glass-active border-indigo-500/20 hover:border-indigo-500/50'
+                          }`}
+                        >
+                          <div className={`transition-all duration-300 ${feita ? 'text-emerald-500 scale-110' : 'text-slate-600'}`}>
+                            {feita ? <CheckCircle2 size={26} className="fill-current" /> : <Circle size={26} />}
+                          </div>
+                          <div className="flex-1">
+                            <p className={`font-semibold text-lg transition-all ${feita ? 'line-through text-slate-500' : 'text-white'}`}>
+                              {h.nome}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              {getIconeCategoria(h.categoria)}
+                              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">{h.categoria}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -379,7 +447,7 @@ function App() {
                   {(Object.keys(diasDisplay) as DiaSemana[]).map(dia => {
                      const qtd = planoSemanal[dia].length;
                      const altura = qtd > 0 ? (qtd / 10) * 100 : 5;
-                     const isHoje = dia === diaRealCodigo;
+                     const isHoje = dia === getDiaSemanaDeData(new Date());
                      return (
                        <div key={dia} className="flex flex-col items-center gap-3 flex-1 group">
                           <div className="w-full relative flex items-end justify-center bg-slate-800/50 rounded-t-lg h-full overflow-hidden">
