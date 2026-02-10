@@ -63,11 +63,6 @@ const BottomNav = ({ tela, setTela }: BottomNavProps) => (
 
 function App() {
   // --- HELPERS ---
-  const getDiaReal = (): DiaSemana => {
-    const map: DiaSemana[] = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
-    return map[new Date().getDay()];
-  };
-
   const formatarDataLocal = (date: Date) => {
     const offset = date.getTimezoneOffset();
     const dataLocal = new Date(date.getTime() - (offset * 60 * 1000));
