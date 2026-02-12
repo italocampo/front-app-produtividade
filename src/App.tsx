@@ -3,8 +3,11 @@ import {
   Plus, Trash2, Activity, Book, Briefcase, Heart, Zap, 
   CheckCircle2, Circle, Smile, Trophy,
   Brain, BarChart3, Calendar, Droplets, Loader2, 
-  LayoutDashboard, ListChecks, ChevronLeft, ChevronRight, TrendingUp
+  LayoutDashboard, ListChecks, ChevronLeft, ChevronRight,
+  Target, Percent 
 } from 'lucide-react';
+// Removi o 'TrendingUp' da linha acima para corrigir o alerta
+
 import type { HabitoBase, PlanoSemanal, DiaSemana } from './types';
 
 // --- CONFIGURAÇÃO DA API ---
@@ -142,7 +145,6 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nome: novoHabito, categoria })
       });
-      // Refresh silencioso
       const dataString = formatarDataLocal(dataVisualizacao);
       const res = await fetch(`${API_URL}/init?data=${dataString}`);
       const data = await res.json();
@@ -233,7 +235,6 @@ function App() {
         {/* --- TELA: HOJE --- */}
         {tela === 'HOJE' && (
           <div className="animate-in fade-in zoom-in duration-500 space-y-6">
-            {/* Header Data */}
             <header className="pt-8 flex flex-col gap-4">
               <div className="flex justify-between items-center">
                 <button onClick={() => mudarDia(-1)} className="p-2 bg-slate-800/50 rounded-full hover:bg-slate-700 transition active:scale-95">
@@ -258,7 +259,6 @@ function App() {
               <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-indigo-500"/></div>
             ) : (
               <>
-                {/* Progress Card (Surface Elevation) */}
                 <div className="bg-[#1e293b]/40 backdrop-blur-md p-6 rounded-3xl border border-white/5 relative overflow-hidden group shadow-xl">
                   <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-10 transition-opacity duration-700">
                     <Trophy size={140} />
@@ -286,7 +286,6 @@ function App() {
                   </div>
                 </div>
 
-                {/* Lista de Tarefas */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1 mt-2">
                     <h2 className="text-slate-400 text-xs font-bold uppercase tracking-wider">
@@ -324,13 +323,10 @@ function App() {
                               : `bg-[#1e293b]/40 backdrop-blur-sm border-white/5 hover:border-indigo-500/30 hover:bg-[#1e293b]/60`
                           }`}
                         >
-                          {/* Barra Lateral Colorida */}
                           <div className={`absolute left-0 top-0 bottom-0 w-1 ${feita ? 'bg-slate-700' : style.bg.replace('/10', '/80')}`}></div>
-
                           <div className={`transition-all duration-300 ${feita ? 'text-emerald-500 scale-110' : 'text-slate-600 group-hover:text-indigo-400'}`}>
                             {feita ? <CheckCircle2 size={26} className="fill-current" /> : <Circle size={26} />}
                           </div>
-                          
                           <div className="flex-1">
                             <p className={`font-semibold text-[15px] transition-all ${feita ? 'line-through text-slate-500' : 'text-slate-100'}`}>
                               {h.nome}
@@ -359,7 +355,6 @@ function App() {
               <p className="text-slate-400 text-sm mt-1">Biblioteca de atividades.</p>
             </header>
 
-            {/* Layout Lei de Fitts: Botão perto do input */}
             <form onSubmit={adicionarHabito} className="bg-[#1e293b]/40 backdrop-blur-md p-5 rounded-3xl space-y-4 border border-white/5 shadow-xl">
               <div className="flex gap-2">
                 <input 
@@ -371,7 +366,6 @@ function App() {
                   <Plus size={24} />
                 </button>
               </div>
-              
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide pt-1">
                 {Object.keys(CATEGORY_STYLES).filter(c => c !== 'Outros').map(cat => {
                   const style = getStyleCategoria(cat);
@@ -384,7 +378,6 @@ function App() {
                           : 'bg-slate-900/50 border-slate-800 text-slate-500 hover:bg-slate-800'
                       }`}
                     >
-                      {/* Pequeno ponto de cor */}
                       <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-current' : style.bg.replace('/10','/50')}`}></div>
                       {cat}
                     </button>
@@ -468,41 +461,56 @@ function App() {
           </div>
         )}
 
-        {/* --- TELA: ESTATISTICAS --- */}
+        {/* --- TELA: ESTATISTICAS (NOVO DASHBOARD) --- */}
         {tela === 'ESTATISTICAS' && (
-          <div className="animate-in fade-in slide-in-from-bottom-8 duration-500 space-y-8">
+          <div className="animate-in fade-in slide-in-from-bottom-8 duration-500 space-y-6">
              <header className="pt-8">
-              <h1 className="text-3xl font-extrabold text-white">Estatísticas</h1>
-              <p className="text-slate-400 text-sm mt-1">Análise de performance.</p>
+              <h1 className="text-3xl font-extrabold text-white">Painel de Dados</h1>
+              <p className="text-slate-400 text-sm mt-1">Métricas da sua rotina.</p>
             </header>
 
-            {/* Comparativo Mockado (Dopamina) */}
-            <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center gap-4">
-               <div className="p-3 bg-emerald-500/20 rounded-full text-emerald-400">
-                 <TrendingUp size={24} />
+            {/* KPIs */}
+            <div className="grid grid-cols-2 gap-3">
+               <div className="bg-[#1e293b]/40 backdrop-blur-md p-4 rounded-2xl border border-white/5 flex flex-col justify-between h-32">
+                  <div className="p-2 bg-emerald-500/20 rounded-lg w-fit text-emerald-400 mb-2"><Percent size={18} /></div>
+                  <div>
+                    <span className="text-3xl font-bold text-white">{progresso}%</span>
+                    <p className="text-xs text-slate-400 font-medium">Taxa de Conclusão</p>
+                  </div>
                </div>
-               <div>
-                 <p className="text-emerald-400 font-bold text-sm">+15% Produtividade</p>
-                 <p className="text-slate-400 text-xs">Comparado à semana passada.</p>
+               
+               <div className="bg-[#1e293b]/40 backdrop-blur-md p-4 rounded-2xl border border-white/5 flex flex-col justify-between h-32">
+                  <div className="p-2 bg-indigo-500/20 rounded-lg w-fit text-indigo-400 mb-2"><Target size={18} /></div>
+                  <div>
+                    <span className="text-xl font-bold text-white truncate block">
+                      {Object.entries(statsPorCategoria).sort((a,b) => b[1].done - a[1].done)[0]?.[0] || "-"}
+                    </span>
+                    <p className="text-xs text-slate-400 font-medium">Maior Foco Hoje</p>
+                  </div>
                </div>
             </div>
 
-            {/* Carga Semanal */}
+            {/* GRÁFICO DE CARGA SEMANAL */}
             <div className="bg-[#1e293b]/40 backdrop-blur-md p-6 rounded-3xl border border-white/5">
-               <h3 className="text-xs font-bold text-slate-400 mb-6 uppercase tracking-wider flex items-center gap-2">
-                 <Calendar size={14} /> Carga Semanal
-               </h3>
-               <div className="flex items-end justify-between h-32 gap-3">
+               <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <Calendar size={14} /> Planejamento da Semana
+                  </h3>
+                  <span className="text-[10px] bg-slate-800 px-2 py-1 rounded text-slate-400">Qtd. Tarefas</span>
+               </div>
+               
+               <div className="flex items-end justify-between h-40 gap-3">
                   {(Object.keys(diasDisplay) as DiaSemana[]).map(dia => {
                      const qtd = planoSemanal[dia].length;
-                     const altura = qtd > 0 ? (qtd / 10) * 100 : 5;
+                     const altura = Math.min((qtd / 10) * 100, 100);
                      const isHoje = dia === getDiaSemanaDeData(new Date());
+                     
                      return (
-                       <div key={dia} className="flex flex-col items-center gap-3 flex-1 group">
-                          <div className="w-full relative flex items-end justify-center bg-slate-800/50 rounded-t-lg h-full overflow-hidden">
+                       <div key={dia} className="flex flex-col items-center gap-2 flex-1 group">
+                          <div className="w-full relative flex items-end justify-center bg-slate-800/30 rounded-lg h-full overflow-hidden">
                              <div 
-                                className={`w-full rounded-t-lg transition-all duration-700 ${isHoje ? 'bg-indigo-500' : 'bg-slate-600 group-hover:bg-slate-500'}`} 
-                                style={{ height: `${Math.min(altura * 1.5, 100)}%` }}
+                                className={`w-full rounded-t-sm transition-all duration-1000 ease-out ${isHoje ? 'bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.4)]' : 'bg-slate-700 group-hover:bg-slate-600'}`} 
+                                style={{ height: `${altura}%` }}
                              ></div>
                           </div>
                           <span className={`text-[10px] font-bold uppercase ${isHoje ? 'text-indigo-400' : 'text-slate-600'}`}>
@@ -514,9 +522,9 @@ function App() {
                </div>
             </div>
 
-            {/* PERFORMANCE POR CATEGORIA */}
+            {/* DETALHAMENTO DE CATEGORIAS */}
             <div className="space-y-4">
-              <h3 className="text-xs font-bold text-slate-500 uppercase ml-1">Foco de Hoje</h3>
+              <h3 className="text-xs font-bold text-slate-500 uppercase ml-1">Distribuição do Dia</h3>
               {Object.keys(statsPorCategoria).length === 0 && <p className="text-slate-600 text-sm italic pl-1">Sem dados para hoje.</p>}
               
               {Object.entries(statsPorCategoria).map(([cat, stats]) => {
@@ -530,7 +538,10 @@ function App() {
                     <div className="flex-1">
                       <div className="flex justify-between mb-2">
                         <span className="font-bold text-sm text-slate-200">{cat}</span>
-                        <span className="text-xs font-bold text-slate-400">{stats.done}/{stats.total} ({pct}%)</span>
+                        <div className="flex items-center gap-2">
+                           <span className="text-[10px] text-slate-500 font-bold uppercase">{stats.done} de {stats.total}</span>
+                           <span className={`text-xs font-bold ${pct === 100 ? 'text-emerald-400' : 'text-slate-300'}`}>{pct}%</span>
+                        </div>
                       </div>
                       <div className="h-1.5 bg-slate-900 rounded-full overflow-hidden">
                         <div 
