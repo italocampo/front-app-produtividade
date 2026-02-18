@@ -4,23 +4,15 @@ import {
   CheckCircle2, Circle, Smile, Trophy,
   Brain, BarChart3, Calendar, Droplets, Loader2, 
   LayoutDashboard, ListChecks, ChevronLeft, ChevronRight,
-  Target, Percent 
+  Target, Percent
 } from 'lucide-react';
-
-// --- TIPOS ---
-type DiaSemana = 'seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab' | 'dom';
-
-interface HabitoBase {
-  id: string;
-  nome: string;
-  categoria: string;
-}
-
-type PlanoSemanal = Record<DiaSemana, string[]>;
-type TelaAtual = 'HOJE' | 'ROTINA' | 'PLANEJAMENTO' | 'ESTATISTICAS';
+import type { HabitoBase, PlanoSemanal, DiaSemana } from './types';
 
 // --- CONFIGURAÇÃO DA API ---
 const API_URL = 'https://backend-apis-api-app-produtividade.t8sftf.easypanel.host';
+
+// --- TIPOS ---
+type TelaAtual = 'HOJE' | 'ROTINA' | 'PLANEJAMENTO' | 'ESTATISTICAS';
 
 // --- PALETA DE CORES POR CATEGORIA ---
 const CATEGORY_STYLES: Record<string, { color: string, bg: string, border: string, icon: string }> = {
@@ -105,6 +97,15 @@ function App() {
   const irParaHoje = () => {
     setDataVisualizacao(new Date());
     setLoading(true);
+  };
+
+  // Função para pular para um dia específico da semana no gráfico
+  const pularParaDiaDaSemana = (targetDiaCode: string) => {
+    const mapDias = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+    const targetIndex = mapDias.indexOf(targetDiaCode);
+    const currentIndex = dataVisualizacao.getDay();
+    const diff = targetIndex - currentIndex;
+    mudarDia(diff);
   };
 
   const getLabelData = () => {
@@ -412,108 +413,53 @@ function App() {
           </div>
         )}
 
-        {/* --- TELA: PLANEJAMENTO (ATUALIZADA) --- */}
+        {/* --- TELA: PLANEJAMENTO --- */}
         {tela === 'PLANEJAMENTO' && (
           <div className="animate-in fade-in slide-in-from-bottom-8 duration-500 space-y-6">
             <header className="pt-8 flex justify-between items-end">
                <div>
                  <h1 className="text-3xl font-extrabold text-white">Planejar</h1>
-                 <p className="text-slate-400 text-sm mt-1">Toque nas barras para ver o dia.</p>
+                 <p className="text-slate-400 text-sm mt-1">Organize sua semana.</p>
                </div>
-               <div className="text-right">
-                 <span className="text-xs font-bold text-indigo-400 uppercase block mb-1">
-                    {diasDisplay[diaSelecionado]}
-                 </span>
-                 <span className="text-2xl font-bold text-white">
-                    {planoSemanal[diaSelecionado].length} <span className="text-xs text-slate-500 font-normal">tarefas</span>
-                 </span>
-               </div>
+               <button onClick={replicarParaSemana} className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-3 py-2 rounded-lg hover:bg-indigo-500/20 transition border border-indigo-500/20">
+                 Copiar Seg ➔ Semana
+               </button>
             </header>
 
-            {/* GRÁFICO INTERATIVO DE SELEÇÃO DE DIA */}
-            <div className="bg-[#1e293b]/40 backdrop-blur-md p-6 rounded-3xl border border-white/5">
-               <div className="flex items-end justify-between h-48 gap-2">
-                  {(Object.keys(diasDisplay) as DiaSemana[]).map(dia => {
-                     const isSelected = diaSelecionado === dia;
-                     const qtd = planoSemanal[dia].length;
-                     // Altura máxima de 100% (teto de 12 tarefas)
-                     const altura = Math.min((qtd / 12) * 100, 100); 
-                     
-                     return (
-                       <button 
-                         key={dia} 
-                         onClick={() => setDiaSelecionado(dia)}
-                         className="flex flex-col items-center gap-3 flex-1 group outline-none"
-                       >
-                          {/* Área da Barra */}
-                          <div className="w-full relative flex items-end justify-center bg-slate-800/30 rounded-t-lg rounded-b-sm h-full overflow-hidden">
-                             <div 
-                                className={`w-full rounded-t-sm transition-all duration-500 ease-out relative ${
-                                  isSelected 
-                                    ? 'bg-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.5)]' 
-                                    : 'bg-slate-700 group-hover:bg-slate-600'
-                                }`} 
-                                style={{ height: `${altura === 0 ? 5 : altura}%` }} // Mínimo de 5%
-                             >
-                                {isSelected && qtd > 0 && (
-                                  <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white animate-in slide-in-from-bottom-2">
-                                    {qtd}
-                                  </span>
-                                )}
-                             </div>
-                          </div>
-                          
-                          {/* Label do Dia */}
-                          <span className={`text-[10px] font-bold uppercase transition-colors ${
-                            isSelected ? 'text-indigo-400' : 'text-slate-600 group-hover:text-slate-400'
-                          }`}>
-                             {dia.substring(0, 3)}
-                          </span>
-                       </button>
-                     )
-                  })}
-               </div>
+            <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
+              {(Object.keys(diasDisplay) as DiaSemana[]).map(dia => {
+                const isActive = diaSelecionado === dia;
+                return (
+                  <button key={dia} onClick={() => setDiaSelecionado(dia)}
+                    className={`px-5 py-3 rounded-2xl font-bold text-sm transition-all whitespace-nowrap border relative overflow-hidden ${
+                      isActive 
+                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/40 scale-105' 
+                        : 'bg-[#1e293b]/50 text-slate-400 border-slate-800 hover:bg-slate-800'
+                    }`}
+                  >
+                    {diasDisplay[dia]}
+                  </button>
+                );
+              })}
             </div>
 
-            {/* BOTÃO DE REPLICAR */}
-            <div className="flex justify-end">
-                <button onClick={replicarParaSemana} className="text-[10px] font-bold text-slate-400 hover:text-indigo-400 bg-slate-800/50 px-3 py-2 rounded-lg transition border border-white/5 flex items-center gap-2">
-                   <ListChecks size={14} /> Copiar Segunda p/ Semana
-                </button>
-            </div>
-
-            {/* LISTA DE TAREFAS DO DIA SELECIONADO */}
-            <div className="bg-[#1e293b]/40 backdrop-blur-md border border-white/5 p-1 rounded-3xl min-h-[300px]">
-              <div className="p-4 border-b border-white/5 mb-2">
-                 <h3 className="text-xs font-bold text-slate-500 uppercase">
-                    Checklist de {diasDisplay[diaSelecionado]}
-                 </h3>
-              </div>
-              
+            <div className="bg-[#1e293b]/40 backdrop-blur-md border border-white/5 p-1 rounded-3xl min-h-[400px]">
               <div className="space-y-1 p-2">
-                {rotinaBase.length === 0 && <p className="text-sm text-slate-500 text-center py-20">Biblioteca vazia. Vá em "Criar".</p>}
-                
+                {rotinaBase.length === 0 && <p className="text-sm text-slate-500 text-center py-20">Vazio. Vá em "Criar" primeiro.</p>}
                 {rotinaBase.map(h => {
                   const selecionado = planoSemanal[diaSelecionado].includes(h.id);
                   const style = getStyleCategoria(h.categoria);
                   return (
                     <div key={h.id} onClick={() => toggleHabitoNoDia(h.id)}
-                      className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all border group ${
-                        selecionado 
-                          ? 'bg-indigo-500/10 border-indigo-500/30' 
-                          : 'bg-transparent border-transparent opacity-50 hover:opacity-100 hover:bg-slate-800/30'
+                      className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all border ${
+                        selecionado ? 'bg-indigo-500/10 border-indigo-500/30' : 'hover:bg-slate-800/30 border-transparent opacity-60 hover:opacity-100'
                       }`}
                     >
-                      <div className={`transition-transform duration-300 ${selecionado ? 'text-indigo-400 scale-110' : 'text-slate-600 group-hover:text-slate-400'}`}>
+                      <div className={`transition-transform ${selecionado ? 'text-indigo-400 scale-110' : 'text-slate-600'}`}>
                         {selecionado ? <CheckCircle2 size={22} className="fill-current" /> : <Circle size={22} />}
                       </div>
-                      <span className={`font-medium text-sm transition-colors ${selecionado ? 'text-white' : 'text-slate-400'}`}>{h.nome}</span>
-                      
-                      {selecionado && (
-                        <div className={`ml-auto px-2 py-0.5 rounded text-[9px] font-bold uppercase ${style.bg} ${style.color}`}>
-                           {h.categoria}
-                        </div>
-                      )}
+                      <span className={`font-medium text-sm ${selecionado ? 'text-white' : 'text-slate-400'}`}>{h.nome}</span>
+                      {selecionado && <div className={`ml-auto w-2 h-2 rounded-full ${style.bg.replace('/10','/80')}`}></div>}
                     </div>
                   );
                 })}
@@ -522,99 +468,127 @@ function App() {
           </div>
         )}
 
-        {/* --- TELA: ESTATISTICAS --- */}
+        {/* --- TELA: ESTATISTICAS (AGORA COM NAVEGAÇÃO DE DATA) --- */}
         {tela === 'ESTATISTICAS' && (
           <div className="animate-in fade-in slide-in-from-bottom-8 duration-500 space-y-6">
              <header className="pt-8">
               <h1 className="text-3xl font-extrabold text-white">Painel de Dados</h1>
-              <p className="text-slate-400 text-sm mt-1">Métricas da sua rotina.</p>
+              <p className="text-slate-400 text-sm mt-1 mb-4">Métricas da sua rotina.</p>
+              
+              {/* NAVEGAÇÃO DE DATA (NOVO!) */}
+              <div className="flex justify-between items-center bg-[#1e293b]/40 p-2 rounded-2xl border border-white/5">
+                <button onClick={() => mudarDia(-1)} className="p-2 bg-slate-800/50 rounded-xl hover:bg-slate-700 transition">
+                  <ChevronLeft size={20} className="text-slate-400" />
+                </button>
+                <div className="flex flex-col items-center cursor-pointer" onClick={irParaHoje}>
+                  <p className="text-indigo-400 font-bold text-[10px] uppercase tracking-widest opacity-90">
+                    {diasDisplay[diaDaSemanaAtual]}
+                  </p>
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    {getLabelData()} 
+                  </h2>
+                </div>
+                <button onClick={() => mudarDia(1)} className="p-2 bg-slate-800/50 rounded-xl hover:bg-slate-700 transition">
+                  <ChevronRight size={20} className="text-slate-400" />
+                </button>
+              </div>
             </header>
 
-            {/* KPIs */}
-            <div className="grid grid-cols-2 gap-3">
-               <div className="bg-[#1e293b]/40 backdrop-blur-md p-4 rounded-2xl border border-white/5 flex flex-col justify-between h-32">
-                  <div className="p-2 bg-emerald-500/20 rounded-lg w-fit text-emerald-400 mb-2"><Percent size={18} /></div>
-                  <div>
-                    <span className="text-3xl font-bold text-white">{progresso}%</span>
-                    <p className="text-xs text-slate-400 font-medium">Taxa de Conclusão</p>
-                  </div>
-               </div>
-               
-               <div className="bg-[#1e293b]/40 backdrop-blur-md p-4 rounded-2xl border border-white/5 flex flex-col justify-between h-32">
-                  <div className="p-2 bg-indigo-500/20 rounded-lg w-fit text-indigo-400 mb-2"><Target size={18} /></div>
-                  <div>
-                    <span className="text-xl font-bold text-white truncate block">
-                      {Object.entries(statsPorCategoria).sort((a,b) => b[1].done - a[1].done)[0]?.[0] || "-"}
-                    </span>
-                    <p className="text-xs text-slate-400 font-medium">Maior Foco Hoje</p>
-                  </div>
-               </div>
-            </div>
+            {loading ? (
+              <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-indigo-500"/></div>
+            ) : (
+              <>
+                {/* KPIs */}
+                <div className="grid grid-cols-2 gap-3">
+                   <div className="bg-[#1e293b]/40 backdrop-blur-md p-4 rounded-2xl border border-white/5 flex flex-col justify-between h-32">
+                      <div className="p-2 bg-emerald-500/20 rounded-lg w-fit text-emerald-400 mb-2"><Percent size={18} /></div>
+                      <div>
+                        <span className="text-3xl font-bold text-white">{progresso}%</span>
+                        <p className="text-xs text-slate-400 font-medium">Taxa de Conclusão</p>
+                      </div>
+                   </div>
+                   
+                   <div className="bg-[#1e293b]/40 backdrop-blur-md p-4 rounded-2xl border border-white/5 flex flex-col justify-between h-32">
+                      <div className="p-2 bg-indigo-500/20 rounded-lg w-fit text-indigo-400 mb-2"><Target size={18} /></div>
+                      <div>
+                        <span className="text-xl font-bold text-white truncate block">
+                          {Object.entries(statsPorCategoria).sort((a,b) => b[1].done - a[1].done)[0]?.[0] || "-"}
+                        </span>
+                        <p className="text-xs text-slate-400 font-medium">Maior Foco no Dia</p>
+                      </div>
+                   </div>
+                </div>
 
-            {/* GRÁFICO DE CARGA SEMANAL (ESTÁTICO PARA VISUALIZAÇÃO GERAL) */}
-            <div className="bg-[#1e293b]/40 backdrop-blur-md p-6 rounded-3xl border border-white/5">
-               <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                    <Calendar size={14} /> Planejamento da Semana
-                  </h3>
-                  <span className="text-[10px] bg-slate-800 px-2 py-1 rounded text-slate-400">Qtd. Tarefas</span>
-               </div>
-               
-               <div className="flex items-end justify-between h-40 gap-3">
-                  {(Object.keys(diasDisplay) as DiaSemana[]).map(dia => {
-                     const qtd = planoSemanal[dia].length;
-                     const altura = Math.min((qtd / 10) * 100, 100);
-                     const isHoje = dia === getDiaSemanaDeData(new Date());
-                     
-                     return (
-                       <div key={dia} className="flex flex-col items-center gap-2 flex-1 group">
-                          <div className="w-full relative flex items-end justify-center bg-slate-800/30 rounded-lg h-full overflow-hidden">
-                             <div 
-                                className={`w-full rounded-t-sm transition-all duration-1000 ease-out ${isHoje ? 'bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.4)]' : 'bg-slate-700 group-hover:bg-slate-600'}`} 
-                                style={{ height: `${altura}%` }}
-                             ></div>
+                {/* GRÁFICO INTERATIVO */}
+                <div className="bg-[#1e293b]/40 backdrop-blur-md p-6 rounded-3xl border border-white/5">
+                   <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                        <Calendar size={14} /> Carga Semanal
+                      </h3>
+                      <span className="text-[10px] text-slate-500">Toque para ver o dia</span>
+                   </div>
+                   
+                   <div className="flex items-end justify-between h-40 gap-3">
+                      {(Object.keys(diasDisplay) as DiaSemana[]).map(dia => {
+                         const qtd = planoSemanal[dia].length;
+                         const altura = Math.min((qtd / 10) * 100, 100);
+                         const isSelected = dia === diaDaSemanaAtual;
+                         
+                         return (
+                           <button 
+                              key={dia} 
+                              onClick={() => pularParaDiaDaSemana(dia)}
+                              className="flex flex-col items-center gap-2 flex-1 group focus:outline-none"
+                           >
+                              <div className="w-full relative flex items-end justify-center bg-slate-800/30 rounded-lg h-full overflow-hidden">
+                                 <div 
+                                    className={`w-full rounded-t-sm transition-all duration-500 ease-out ${isSelected ? 'bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.6)]' : 'bg-slate-700 group-hover:bg-slate-600'}`} 
+                                    style={{ height: `${altura}%` }}
+                                 ></div>
+                              </div>
+                              <span className={`text-[10px] font-bold uppercase transition-colors ${isSelected ? 'text-indigo-400' : 'text-slate-600'}`}>
+                                 {dia.substring(0, 3)}
+                              </span>
+                           </button>
+                         )
+                      })}
+                   </div>
+                </div>
+
+                {/* DETALHAMENTO DE CATEGORIAS */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold text-slate-500 uppercase ml-1">Detalhes de {getLabelData()}</h3>
+                  {Object.keys(statsPorCategoria).length === 0 && <p className="text-slate-600 text-sm italic pl-1">Sem dados para este dia.</p>}
+                  
+                  {Object.entries(statsPorCategoria).map(([cat, stats]) => {
+                    const pct = Math.round((stats.done / stats.total) * 100);
+                    const style = getStyleCategoria(cat);
+                    return (
+                      <div key={cat} className="bg-[#1e293b]/40 backdrop-blur-md p-4 rounded-2xl flex items-center gap-4 border border-white/5">
+                        <div className={`p-3 rounded-xl ${style.bg} ${style.color}`}>
+                          {getIconeCategoria(cat)}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex justify-between mb-2">
+                            <span className="font-bold text-sm text-slate-200">{cat}</span>
+                            <div className="flex items-center gap-2">
+                               <span className="text-[10px] text-slate-500 font-bold uppercase">{stats.done}/{stats.total}</span>
+                               <span className={`text-xs font-bold ${pct === 100 ? 'text-emerald-400' : 'text-slate-300'}`}>{pct}%</span>
+                            </div>
                           </div>
-                          <span className={`text-[10px] font-bold uppercase ${isHoje ? 'text-indigo-400' : 'text-slate-600'}`}>
-                             {dia.substring(0, 3)}
-                          </span>
-                       </div>
-                     )
-                  })}
-               </div>
-            </div>
-
-            {/* DETALHAMENTO DE CATEGORIAS */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold text-slate-500 uppercase ml-1">Distribuição do Dia</h3>
-              {Object.keys(statsPorCategoria).length === 0 && <p className="text-slate-600 text-sm italic pl-1">Sem dados para hoje.</p>}
-              
-              {Object.entries(statsPorCategoria).map(([cat, stats]) => {
-                const pct = Math.round((stats.done / stats.total) * 100);
-                const style = getStyleCategoria(cat);
-                return (
-                  <div key={cat} className="bg-[#1e293b]/40 backdrop-blur-md p-4 rounded-2xl flex items-center gap-4 border border-white/5">
-                    <div className={`p-3 rounded-xl ${style.bg} ${style.color}`}>
-                      {getIconeCategoria(cat)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between mb-2">
-                        <span className="font-bold text-sm text-slate-200">{cat}</span>
-                        <div className="flex items-center gap-2">
-                           <span className="text-[10px] text-slate-500 font-bold uppercase">{stats.done} de {stats.total}</span>
-                           <span className={`text-xs font-bold ${pct === 100 ? 'text-emerald-400' : 'text-slate-300'}`}>{pct}%</span>
+                          <div className="h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full transition-all duration-1000 ${style.bg.replace('/10', '')}`} 
+                              style={{ backgroundColor: 'currentColor', color: 'inherit', width: `${pct}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
-                      <div className="h-1.5 bg-slate-900 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full transition-all duration-1000 ${style.bg.replace('/10', '')}`} 
-                          style={{ backgroundColor: 'currentColor', color: 'inherit', width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
           </div>
         )}
 
