@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Plus, Trash2, Activity, Book, Briefcase, Heart, Zap, 
-  CheckCircle2, Circle, Smile, Trophy,
+  CheckCircle2, Circle, Smile, 
   Brain, BarChart3, Calendar, Droplets, Loader2, 
   LayoutDashboard, ListChecks, ChevronLeft, ChevronRight,
   Target, Percent
